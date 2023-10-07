@@ -80,8 +80,9 @@ async function run() {
         const query = await habitCollection
           .find({ email: habit.email })
           .toArray();
+        console.log(query);
         if (query) {
-          const order = { ...habit, habitNumber: query.habitNumber + 1, archive: 0 };
+          const order = { ...habit, habitNumber: query.length + 1, archive: 0 };
           const result = await habitCollection.insertOne(order);
           res.send(result);
         } else {
@@ -136,13 +137,38 @@ async function run() {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
         const body = req.body;
+        const note = await notesCollection.findOne(query);
         const options = { upsert: true };
+
         const updatePhoto = {
           $set: {
-            text: body?.text,
+            text: body?.text ? body?.text : note.text,
           },
         };
         const result = await notesCollection.updateOne(
+          query,
+          updatePhoto,
+          options
+        );
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+    app.patch("/update-habit/:id", verifyJWT, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const body = req.body;
+        const habit = await habitCollection.findOne(query);
+        const options = { upsert: true };
+        const updatePhoto = {
+          $set: {
+            habit: body?.habit ? body?.habit : habit.habit,
+            goal: body?.goal ? body?.goal : habit?.goal,
+          },
+        };
+        const result = await habitCollection.updateOne(
           query,
           updatePhoto,
           options
