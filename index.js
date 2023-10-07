@@ -81,7 +81,7 @@ async function run() {
           .find({ email: habit.email })
           .toArray();
         if (query) {
-          const order = { ...habit, habitNumber: query.length + 1, archive: 0 };
+          const order = { ...habit, habitNumber: query.habitNumber + 1, archive: 0 };
           const result = await habitCollection.insertOne(order);
           res.send(result);
         } else {
@@ -135,7 +135,18 @@ async function run() {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
-        const result = await notesCollection.deleteOne(query);
+        const body = req.body;
+        const options = { upsert: true };
+        const updatePhoto = {
+          $set: {
+            text: body?.text,
+          },
+        };
+        const result = await notesCollection.updateOne(
+          query,
+          updatePhoto,
+          options
+        );
         res.send(result);
       } catch (error) {
         console.log(error);
