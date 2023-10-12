@@ -77,16 +77,28 @@ async function run() {
     app.post("/habit", verifyJWT, async (req, res) => {
       try {
         const habit = req.body;
+        console.log(habit);
         const query = await habitCollection
-          .find({ email: habit.email })
+          .find({ userEmail: habit.userEmail })
           .toArray();
-        console.log(query);
+        console.log(query.length);
         if (query) {
-          const order = { ...habit, habitNumber: query.length + 1, archive: 0 };
+          const order = {
+            ...habit,
+            habitNumber: query.length + 1,
+            archive: 0,
+            clickedDay: [],
+          };
           const result = await habitCollection.insertOne(order);
           res.send(result);
         } else {
-          const order = { ...habit, habitNumber: 1, archive: 0 };
+          const order = {
+            ...habit,
+            habitNumber: 1,
+            archive: 0,
+            clickedDay: [],
+            bg_color: "#FDF2D0",
+          };
           const result = await habitCollection.insertOne(order);
           res.send(result);
         }
@@ -174,6 +186,102 @@ async function run() {
           options
         );
         res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+    // todo
+    app.patch("/tracker/:id", verifyJWT, async (req, res) => {
+      try {
+        const body = req.body;
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const habit = await habitCollection.findOne(query);
+        const options = { upsert: true };
+        const indexToUpdate = habit.clickedDay.findIndex((h) => {
+          return (
+            h?.date === body.clickedDay.date &&
+            h?.month === body.clickedDay.month &&
+            h?.year === body.clickedDay.year
+          );
+        });
+        const getCheckedDay = habit?.clickedDay.find((h) => {
+          return (
+            h?.date === body.clickedDay.date &&
+            h?.month === body.clickedDay.month &&
+            h?.year === body.clickedDay.year
+          );
+        });
+        const archive = habit?.clickedDay.filter((h) => h?.checked == true);
+
+        console.log(body, getCheckedDay, 214);
+        if (indexToUpdate !== -1) {
+          if (getCheckedDay.checked) {
+            const updateObj = {
+              $set: {
+                archive: archive.length - 1,
+                [`clickedDay.${indexToUpdate}.Habit_Id`]:
+                  body?.clickedDay.Habit_Id,
+                [`clickedDay.${indexToUpdate}.checkId`]: 0,
+                [`clickedDay.${indexToUpdate}.checked`]: false,
+                [`clickedDay.${indexToUpdate}.date`]: body?.clickedDay.date,
+                [`clickedDay.${indexToUpdate}.month`]: body?.clickedDay.month,
+                [`clickedDay.${indexToUpdate}.year`]: body?.clickedDay.year,
+              },
+            };
+            const result = await habitCollection.updateOne(
+              query,
+              updateObj,
+              options
+            );
+            res.send(result);
+          } else {
+            const updateObj = {
+              $set: {
+                archive: archive.length + 1,
+
+                [`clickedDay.${indexToUpdate}.Habit_Id`]:
+                  body?.clickedDay.Habit_Id,
+                [`clickedDay.${indexToUpdate}.checkId`]:
+                  body?.clickedDay.checkId,
+                [`clickedDay.${indexToUpdate}.checked`]:
+                  body?.clickedDay.checked,
+                [`clickedDay.${indexToUpdate}.date`]: body?.clickedDay.date,
+                [`clickedDay.${indexToUpdate}.month`]: body?.clickedDay.month,
+                [`clickedDay.${indexToUpdate}.year`]: body?.clickedDay.year,
+              },
+            };
+            const result = await habitCollection.updateOne(
+              query,
+              updateObj,
+              options
+            );
+            res.send(result);
+          }
+        } else {
+          const newClickedDay = {
+            Habit_Id: body?.clickedDay.Habit_Id,
+            checkId: body?.clickedDay.checkId,
+            checked: body?.clickedDay.checked,
+            date: body?.clickedDay.date,
+            month: body?.clickedDay.month,
+            year: body?.clickedDay.year,
+          };
+          const updateObj = {
+            $set: {
+              archive: archive.length == 0 ? 1 : archive.length + 1,
+            },
+            $push: {
+              clickedDay: newClickedDay,
+            },
+          };
+          const result = await habitCollection.updateOne(
+            query,
+            updateObj,
+            options
+          );
+          res.send(result);
+        }
       } catch (error) {
         console.log(error);
       }
